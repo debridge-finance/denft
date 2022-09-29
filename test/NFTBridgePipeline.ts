@@ -319,7 +319,7 @@ describe('Send THIRDPARTY NFT', async () => {
                 deadline, // deadline
             );
 
-            const sendTx = await nftBridgeETH.connect(deployer).send(
+            const sendTx = await nftBridgeETH.connect(deployer)['send(address,uint256,uint256,bytes,uint256,address,uint256,uint32)'](
                 nft.address,
                 TOKEN_ID,
                 deadline,
@@ -472,7 +472,7 @@ describe('Send THIRDPARTY NFT', async () => {
                 const deNftToken = nft.attach(deNftTokenAddress)
                 await deNftToken.connect(deployer)
                     .approve(nftBridgeBSC.address, TOKEN_ID);
-                const tx = await nftBridgeBSC.connect(deployer).send(
+                const tx = await nftBridgeBSC.connect(deployer)['send(address,uint256,uint256,bytes,uint256,address,uint256,uint32)'](
                     deNftTokenAddress,
                     TOKEN_ID,
                     0,
@@ -529,7 +529,7 @@ describe('Send THIRDPARTY NFT', async () => {
             test(`Send back NFT from BSC to ETH (lock/mint flow)`, async () => {
                 await wrappedNftBSC.connect(deployer).approve(nftBridgeBSC.address, TOKEN_ID);
                 const lastNonce = await nftBridgeBSC.nonce();
-                const sendTx = await nftBridgeBSC.connect(deployer).send(
+                const sendTx = await nftBridgeBSC.connect(deployer)['send(address,uint256,uint256,bytes,uint256,address,uint256,uint32)'](
                     wrappedNftBSC.address,
                     TOKEN_ID,
                     0,
@@ -775,7 +775,7 @@ describe('CreateNFT', async () => {
         test(`Repeat ${i}. Send deNFT from ETH to BSC (burn/mint flow)`, async () => {
             await currentNftETH.connect(deployer).approve(nftBridgeETH.address, TOKEN_ID);
             const lastNonce = await nftBridgeETH.nonce();
-            const sendTx = await nftBridgeETH.connect(deployer).send(
+            const sendTx = await nftBridgeETH.connect(deployer)['send(address,uint256,uint256,bytes,uint256,address,uint256,uint32)'](
                 currentNftETH.address,
                 TOKEN_ID,
                 0,
@@ -872,7 +872,7 @@ describe('CreateNFT', async () => {
         test(`Repeat ${i}. Send back deNFT from BSC to ETH (burn/mint flow)`, async () => {
             await wrappedNftBSC.connect(deployer).approve(nftBridgeBSC.address, TOKEN_ID);
             const lastNonce = await nftBridgeBSC.nonce();
-            const sendTx = await nftBridgeBSC.connect(deployer).send(
+            const sendTx = await nftBridgeBSC.connect(deployer)['send(address,uint256,uint256,bytes,uint256,address,uint256,uint32)'](
                 wrappedNftBSC.address,
                 TOKEN_ID,
                 0,
