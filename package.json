@@ -11,7 +11,8 @@
   "dependencies": {
     "@debridge-finance/debridge-protocol-evm-interfaces": "^1.0.0",
     "@openzeppelin/contracts": "4.7.3",
-    "@openzeppelin/contracts-upgradeable": "^4.7.3"
+    "@openzeppelin/contracts-upgradeable": "^4.7.3",
+    "dotenv-flow": "^3.2.0"
   },
   "devDependencies": {
     "@ethereum-waffle/mock-contract": "^3.4.4",
@@ -29,6 +30,7 @@
     "chai": "^4.3.6",
     "ethers": "^5.7.1",
     "hardhat": "^2.0.0",
+    "hardhat-deploy": "^0.11.15",
     "ts-node": "^10.9.1",
     "typechain": "^8.1.0"
   },
