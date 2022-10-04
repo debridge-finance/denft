@@ -115,6 +115,65 @@ contract DeNftBridge is
         uint256 _executionFee,
         uint32 _referralCode
     ) external payable nonReentrant whenNotPaused {
+        _send(
+            _nftCollectionAddress,
+            _tokenId,
+            _permitDeadline,
+            _permitSignature,
+            _chainIdTo,
+            _receiverAddress,
+            "", // _receiverData
+            _executionFee,
+            _referralCode
+        );
+    }
+
+    /// @dev Constructs and initiates a cross chain transfer of an object.
+    ///         It obtains an object from the sender and constructs a message to operate the object on the target chain
+    /// @param _nftCollectionAddress NFT collection's address in the current chain
+    /// @param _tokenId ID of an object from the given NFT collection to transfer
+    /// @param _permitDeadline ERC-4494-compliant permit deadline
+    /// @param _permitSignature ERC-4494-compliant permit signature to obtain the given object
+    /// @param _chainIdTo Target chain id to transfer the given object to
+    /// @param _receiverAddress Address on the target chain to transfer the bridged object to
+    /// @param _receiverData Arbitrary data to be passed to the receiver contract by calling the onERC721Received() hook
+    /// @param _executionFee  Fee to be paid to the claim transaction executor on target chain.
+    /// @param _referralCode Referral code to be assigned to this cross chain transaction on the deBridge protocol
+    function send(
+        address _nftCollectionAddress,
+        uint256 _tokenId,
+        uint256 _permitDeadline,
+        bytes calldata _permitSignature,
+        uint256 _chainIdTo,
+        address _receiverAddress,
+        bytes memory _receiverData,
+        uint256 _executionFee,
+        uint32 _referralCode
+    ) external payable nonReentrant whenNotPaused {
+        _send(
+            _nftCollectionAddress,
+            _tokenId,
+            _permitDeadline,
+            _permitSignature,
+            _chainIdTo,
+            _receiverAddress,
+            _receiverData,
+            _executionFee,
+            _referralCode
+        );
+    }
+
+    function _send(
+        address _nftCollectionAddress,
+        uint256 _tokenId,
+        uint256 _permitDeadline,
+        bytes calldata _permitSignature,
+        uint256 _chainIdTo,
+        address _receiverAddress,
+        bytes memory _receiverData,
+        uint256 _executionFee,
+        uint32 _referralCode
+    ) internal {
         // NFTBridge is not yet deployed on the target chain or its address is not yet registered here
         // -- no receiver on the target chain
         if (!getChainInfo[_chainIdTo].isSupported) {
@@ -173,7 +232,7 @@ contract DeNftBridge is
             }
 
             // Encode the function call to be executed on the target chain
-            targetData = _encodeClaimOrMint(nativeTokenInfo, _tokenId, _receiverAddress, tokenURI);
+            targetData = _encodeClaimOrMint(nativeTokenInfo, _tokenId, _receiverAddress, _receiverData, tokenURI);
         }
 
         //
@@ -210,12 +269,42 @@ contract DeNftBridge is
     /// @param _receiver Address on target chain who will receive the object.
     /// @param _tokenUri Payload: the canonical URI of an object from the given NFT collection to mint
     /// @param _tokenInfo Original information about NFT
+    /// @notice Deprecated
     function claimOrMint(
         uint256 _tokenId,
         address _receiver,
         string calldata _tokenUri,
         NativeNFTInfo calldata _tokenInfo
     ) external onlyCrossBridgeAddress whenNotPaused {
+        _claimOrMint(_tokenId, _receiver, "", _tokenUri, _tokenInfo);
+    }
+
+    /// @dev Mints the original object (if called on the native chain for burn/mint-compatible DeNFT collection)
+    ///         or a wrapped version of an object (if called on the secondary chain).
+    ///         This method is restricted by onlyCrossBridgeAddress modifier: it can be called only by deBridge CallProxy
+    ///         and the origin transaction submitter must be an NFTBridge contract on the origin chain
+    /// @param _tokenId ID of an object from the given NFT collection to receive and mint
+    /// @param _receiver Address on target chain who will receive the object.
+    /// @param _receiverData Arbitrary data to be passed to the receiver contract by calling the onERC721Received() hook
+    /// @param _tokenUri Payload: the canonical URI of an object from the given NFT collection to mint
+    /// @param _tokenInfo Original information about NFT
+    function claimOrMintWithData(
+        uint256 _tokenId,
+        address _receiver,
+        bytes memory _receiverData,
+        string calldata _tokenUri,
+        NativeNFTInfo calldata _tokenInfo
+    ) external onlyCrossBridgeAddress whenNotPaused {
+        _claimOrMint(_tokenId, _receiver, _receiverData, _tokenUri, _tokenInfo);
+    }
+
+    function _claimOrMint(
+        uint256 _tokenId,
+        address _receiver,
+        bytes memory _receiverData,
+        string calldata _tokenUri,
+        NativeNFTInfo calldata _tokenInfo
+    ) internal {
         bytes32 debridgeId = getDebridgeId(_tokenInfo.chainId, _tokenInfo.tokenAddress);
         BridgeNFTInfo storage bridgeInfo = getBridgeNFTInfo[debridgeId];
 
@@ -225,7 +314,7 @@ contract DeNftBridge is
             _safeOwnerOf(bridgeInfo.tokenAddress, _tokenId) == address(this)
         ) {
             // withdraw nft to receiver
-            _safeTransferFrom(bridgeInfo.tokenAddress, address(this), _receiver, _tokenId);
+            _safeTransferFrom(bridgeInfo.tokenAddress, address(this), _receiver, _tokenId, _receiverData);
             emit NFTClaimed(bridgeInfo.tokenAddress, _tokenId, _receiver);
         } else {
             // sanity check: ensure that this conditional branch handles in-house DeNFTs
@@ -257,8 +346,11 @@ contract DeNftBridge is
                     _tokenInfo.tokenType
                 );
             }
+            // mint a token to this contract address...
             address tokenAddress = getBridgeNFTInfo[debridgeId].tokenAddress;
-            IDeNFT(tokenAddress).mint(_receiver, _tokenId, _tokenUri);
+            IDeNFT(tokenAddress).mint(address(this), _tokenId, _tokenUri);
+            // ...then transfer it to receiver. This is an important step to fire onERC721Received() upon transfer
+            _safeTransferFrom(bridgeInfo.tokenAddress, address(this), _receiver, _tokenId, _receiverData);
 
             emit NFTMinted(tokenAddress, _tokenId, _receiver, _tokenUri);
         }
@@ -397,7 +489,7 @@ contract DeNftBridge is
 
     function _receiveNativeNFT(address _tokenAddress, uint256 _tokenId) internal {
         _addNativeAssetIfNew(_tokenAddress);
-        _safeTransferFrom(_tokenAddress, msg.sender, address(this), _tokenId);
+        _safeTransferFrom(_tokenAddress, msg.sender, address(this), _tokenId, "" /*_receiverData*/);
     }
 
     /// @dev Save information about token to BridgeNFTInfo and NativeNFTInfo if this token transfer first time
@@ -422,9 +514,10 @@ contract DeNftBridge is
         address _tokenAddress,
         address _from,
         address _to,
-        uint256 _tokenId
+        uint256 _tokenId,
+        bytes memory _data
     ) internal {
-        IERC721Upgradeable(_tokenAddress).safeTransferFrom(_from, _to, _tokenId);
+        IERC721Upgradeable(_tokenAddress).safeTransferFrom(_from, _to, _tokenId, _data);
 
         // check that this contract address actually received the object
         if (_safeOwnerOf(_tokenAddress, _tokenId) != _to) revert NotReceivedERC721();
@@ -435,13 +528,15 @@ contract DeNftBridge is
         NativeNFTInfo storage nativeTokenInfo,
         uint256 _tokenId,
         address _receiverAddress,
+        bytes memory _receiverData,
         string memory _tokenURI
     ) internal pure returns (bytes memory) {
         return
             abi.encodeWithSelector(
-                this.claimOrMint.selector,
+                this.claimOrMintWithData.selector,
                 _tokenId,
                 _receiverAddress,
+                _receiverData,
                 _tokenURI,
                 nativeTokenInfo
             );
