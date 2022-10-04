@@ -269,13 +269,42 @@ contract DeNftBridge is
     /// @param _receiver Address on target chain who will receive the object.
     /// @param _tokenUri Payload: the canonical URI of an object from the given NFT collection to mint
     /// @param _tokenInfo Original information about NFT
+    /// @notice Deprecated
     function claimOrMint(
+        uint256 _tokenId,
+        address _receiver,
+        string calldata _tokenUri,
+        NativeNFTInfo calldata _tokenInfo
+    ) external onlyCrossBridgeAddress whenNotPaused {
+        _claimOrMint(_tokenId, _receiver, "", _tokenUri, _tokenInfo);
+    }
+
+    /// @dev Mints the original object (if called on the native chain for burn/mint-compatible DeNFT collection)
+    ///         or a wrapped version of an object (if called on the secondary chain).
+    ///         This method is restricted by onlyCrossBridgeAddress modifier: it can be called only by deBridge CallProxy
+    ///         and the origin transaction submitter must be an NFTBridge contract on the origin chain
+    /// @param _tokenId ID of an object from the given NFT collection to receive and mint
+    /// @param _receiver Address on target chain who will receive the object.
+    /// @param _receiverData Arbitrary data to be passed to the receiver contract by calling the onERC721Received() hook
+    /// @param _tokenUri Payload: the canonical URI of an object from the given NFT collection to mint
+    /// @param _tokenInfo Original information about NFT
+    function claimOrMintWithData(
         uint256 _tokenId,
         address _receiver,
         bytes memory _receiverData,
         string calldata _tokenUri,
         NativeNFTInfo calldata _tokenInfo
     ) external onlyCrossBridgeAddress whenNotPaused {
+        _claimOrMint(_tokenId, _receiver, _receiverData, _tokenUri, _tokenInfo);
+    }
+
+    function _claimOrMint(
+        uint256 _tokenId,
+        address _receiver,
+        bytes memory _receiverData,
+        string calldata _tokenUri,
+        NativeNFTInfo calldata _tokenInfo
+    ) internal {
         bytes32 debridgeId = getDebridgeId(_tokenInfo.chainId, _tokenInfo.tokenAddress);
         BridgeNFTInfo storage bridgeInfo = getBridgeNFTInfo[debridgeId];
 
@@ -504,7 +533,7 @@ contract DeNftBridge is
     ) internal pure returns (bytes memory) {
         return
             abi.encodeWithSelector(
-                this.claimOrMint.selector,
+                this.claimOrMintWithData.selector,
                 _tokenId,
                 _receiverAddress,
                 _receiverData,
